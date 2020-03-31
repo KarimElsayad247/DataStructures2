@@ -1,0 +1,6 @@
+# depslib dependency file v1.0
+1585679424 source:d:\study material\6th term\data structures 2\labs\datastructures2\datastructures2\redblacktree\main.c
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+
