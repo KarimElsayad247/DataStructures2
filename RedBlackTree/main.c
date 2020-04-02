@@ -4,14 +4,14 @@
 
 
 typedef enum EColor {BLACK = 0, RED = 1}EColor;
-typedef int     DATA;
+typedef char     DATA;
 
 
 
 //Node structure
 struct Node {
         EColor color;
-        DATA value;
+        DATA* value;
         struct Node* parent;
         struct Node* left;
         struct Node* right;
@@ -24,19 +24,25 @@ struct Tree{
 };
 
 
-void parent_print(struct Node* root);
 void inserted(struct Node* node);
 void traverse_indepth(struct Node* node);
-void print_tree_stuff(struct Tree* my_tree);
+void nprint(struct Node* node);
+void compare_with_file(struct Tree* tree, char* file_name);
 
-struct Node* create_rb_node(DATA value){
+struct Node* create_rb_node(DATA* value){
         struct Node* temp = (struct Node*)malloc(sizeof(struct Node));
         if(!temp){
                 printf("Error allocating memory for temp!");
                 return NULL;
         }
         //an rb node always starts red, and is modified later
-        temp->value = value;
+        temp->value = malloc(strlen(value)+1);
+        if(temp->value == NULL){
+                printf("Error allocating memory for string on creation!");
+                exit(255);
+        }
+
+        strcpy(temp->value, value);
         temp->color = RED;
         temp->left = NULL;
         temp->right = NULL;
@@ -107,25 +113,25 @@ void rotate_right(struct Tree* tree, struct Node* node){
  *knows the tree struct
  */
 struct Node* normal_insert(struct Node* root, struct Node* new_node){
+        //printf("in normal insert I see %s\n", new_node->value);
         //if you find NULL, then insert the new node here
         //i.e. the previous node will now point here
-        if(root == NULL)
+        if(root == NULL){
                 return new_node;
+        }
 
         //insert recursively depending on value
-        if(new_node->value < root->value){
+        if(strcmp(new_node->value,root->value) < 0){
                 root->left = normal_insert(root->left, new_node);
                 root->left->parent = root;
-//                parent_print(root->left);
 
         }
-        else if (new_node->value > root->value){
+        else if (strcmp(new_node->value,root->value) > 0){
                 root->right = normal_insert(root->right, new_node);
                 root->right->parent = root;
-//                parent_print(root->right);
         }
         else{
-                printf("Node already exits!\n");
+                printf("word already exits!\n");
         }
         return root;
 }
@@ -160,6 +166,7 @@ void rb_fixup(struct Tree* tree, struct Node* node) {
         else if(parent == gparent->right){
                 uncle = gparent->left;
         }
+
         if(uncle == NULL || uncle->color == BLACK){
                 black_uncle = 1;
         }
@@ -174,16 +181,37 @@ void rb_fixup(struct Tree* tree, struct Node* node) {
         }
         /*case 2: uncle is black and node is a right child*/
         if(black_uncle){
-                if(parent->right == node)
-                        rotate_left(tree, parent);
-
-                /*after case 2, check also for case 3
-                 *case 3: uncle is black and node is a left child
-                 */
-                if(parent->left == node){
-                        parent->color = BLACK;
-                        gparent->color = RED;
-                        rotate_right(tree, gparent);
+                if(parent == gparent->left){
+                        if(node == parent->right){
+                                rotate_left(tree, parent);
+                                struct Node* temp = node;
+                                node = parent;
+                                parent = temp;
+                        }
+                        /*after case 2, check also for case 3
+                         *case 3: uncle is black and node is a left child
+                         */
+                        if(node == parent->left ){
+                                parent->color = BLACK;
+                                gparent->color = RED;
+                                rotate_right(tree, gparent);
+                        }
+                }
+                else if(parent == gparent->right){
+                        if(node == parent->left){
+                                rotate_right(tree, parent);
+                                struct Node* temp = node;
+                                node = parent;
+                                parent = temp;
+                        }
+                        /*after case 2, check also for case 3
+                         *case 3: uncle is black and node is a left child
+                         */
+                        if(node == parent->right){
+                                parent->color = BLACK;
+                                gparent->color = RED;
+                                rotate_left(tree, gparent);
+                        }
                 }
         }
         return;
@@ -192,6 +220,8 @@ void rb_fixup(struct Tree* tree, struct Node* node) {
 
 void rb_insert(struct Tree* my_tree, struct Node* node){
         my_tree->root = normal_insert(my_tree->root, node);
+        my_tree->size++;
+        if((my_tree->size%10000) == 0 ) printf("%d\n", my_tree->size);
         rb_fixup(my_tree, node);
 }
 
@@ -201,50 +231,50 @@ void rb_insert(struct Tree* my_tree, struct Node* node){
  *n is array size
  *root is the tree to build
  */
-struct Tree* build_tree(DATA* srcArray, unsigned int n){
-        //if pointer is null, do nothing
-        if(srcArray == NULL){
-                printf("no array!");
-                return NULL;
-        }
-        //if array is empty, also do nothing
-        if(n < 1){
-                printf("array empty!");
-                return NULL;
-        }
-        //otherwise, build tree
+struct Tree* build_tree(FILE* file){
+        //build tree
         //first declare a root node then,
-        //loop over the array and insert values into the tree
-        struct Node* root = create_rb_node(srcArray[0]);
+        //loop over the file and insert words into the tree
+        DATA root_data[16];
+        fscanf(file,"%[^\n]", root_data);
+        struct Node* root = create_rb_node(root_data);
         root->color = BLACK;
         struct Tree* new_tree = malloc(sizeof(struct Tree));
         new_tree->root = root;
-        new_tree->size = n;
-        unsigned int i = 0;
-        for(i = 1; i < n; i++) {
-                rb_insert(new_tree, create_rb_node(srcArray[i]));
-//                new_tree->root = normal_insert(new_tree->root, create_rb_node(srcArray[i]));
+        new_tree->size = 0;
+        char input[16];
+        while(fscanf(file, " %[^\n]", input) != EOF ){
+                rb_insert(new_tree, create_rb_node(input));
         }
-
-        if(new_tree->size != i)
-                printf("something wrong with tree size!\n");
         return new_tree;
 }
 
 
+int find_tree_hight(struct Node* node){
+        if(node == NULL)
+                return 0;
+        int h1 = find_tree_hight(node->left);
+        int h2 = find_tree_hight(node->right);
+        return ((h1 > h2) ? h1 : h2) + 1;
+}
 
-/*in depth traverse and check for value
- *if smaller, recursively search left
- *if larger, recursively search right
- */
-int rb_search(struct Node* node, DATA value){
+
+void tree_print_all(struct Node* node){
+        if(node == NULL) return;
+        tree_print_all(node->left);
+        printf("%s\n",node->value, node->color);
+        tree_print_all(node->right);
+}
+
+
+
+int rb_search(struct Node* node, DATA* value){
         /****remember to check for NULL before printing, searching, or doing anything****/
-
         //recursion FTW
-        if(node != NULL){
-                if(node->value == value)
+        if(node){
+                if(strcmp(value, node->value) == 0)
                         return 1;
-                else if(value < node->value)
+                else if(strcmp(value, node->value) < 1)
                         return rb_search(node->left, value);
                 else
                         return rb_search(node->right, value);
@@ -254,55 +284,162 @@ int rb_search(struct Node* node, DATA value){
 }
 
 
+void insert_new_word(struct Tree* my_tree){
+        char input[16];
+        fgets(input, sizeof input, stdin);
+        printf("Word to add: ");
+        fgets(input, sizeof input, stdin);
+        sscanf(input, " %[^\n]", input);
+        if(rb_search(my_tree->root, input)){
+                printf("Word already exists\n");
+                return;
+        }
+        rb_insert(my_tree, create_rb_node(input));
+        printf("Word added successfully!\n");
+        printf("Size: %3d\tHight: %2d\n",my_tree->size,find_tree_hight(my_tree->root));
+}
 
 
+void lookup_word(struct Tree* my_tree){
+        char input[16];
+        fgets(input, sizeof input, stdin);
+        printf("Enter Word to lookup: ");
+        fgets(input, sizeof input, stdin);
+        sscanf(input, " %[^\n]", input);
+        printf("Word exists? ");
+        if(rb_search(my_tree->root, input))
+                printf("YES\n");
+        else
+                printf("NO\n");
 
-int main() {
-
-        DATA array[8] = {10,9,8,7 ,6,5,4,3};//,6,5,4,3,2,1};//,15,90,11,23};
-        struct Tree* my_tree = build_tree(array, 8);
-        if(my_tree == NULL) printf("Error creating tree in main");
+}
 
 
-        /*tests*/
-//        printf("traversing\n");
-        printf("\n in main\nroot is %5d\tcolor %d\n",my_tree->root->value,my_tree->root->color);
-        print_tree_stuff(my_tree);
-//        parent_print(my_tree->root);
-        traverse_indepth(my_tree->root);
-//        for(int i = 0; i < 3; i++){
-//                rotate_right(my_tree, my_tree->root);
-//                printf("\n\n\ntraversing\n");
-//                printf("after rotate %d\n", i);
-//                traverse_indepth(my_tree->root);
-////                printf("root is%5d\t\t\t\t\n",my_tree->root->value);
-//                print_tree_stuff(my_tree);
-//        }
-//        for(int i = 0; i < 3; i++){
-//                rotate_left(my_tree, my_tree->root);
-//                printf("\n\n\ntraversing\n");
-//                printf("after rotate %d\n", i);
-//                traverse_indepth(my_tree->root);
-////                printf("root is%5d\t\t\t\t\n",my_tree->root->value);
-//                print_tree_stuff(my_tree);
-//        }
-//        rotate_left(my_tree, my_tree->root->right);
-//        printf("rotating\n");
-//        print_tree_stuff(my_tree);
-//        parent_print(my_tree->root);
-//        traverse_indepth(my_tree->root);
-//        int test_num = 90;
-//        if(rb_search(my_tree->root, test_num))
-//                printf("YES %d\n", test_num);
-//        else
-//                printf("NO\n");
+void write_tree(struct Node* node, FILE* file){
+        if(node == NULL) return;
+
+        write_tree(node->left, file);
+        fprintf(file, "%s\n", node->value);
+        write_tree(node->right, file);
+}
+
+
+void save_to_file(struct Tree* tree, char* file_name){
+        fgetc(stdin);
+        printf("This will overwrite the current file, are you sure?\n");
+        printf("Y/N\t");
+        char temp[30];
+        char letter = 'N';
+        fgets(temp, sizeof temp, stdin);
+        sscanf(temp, " %[^\n]", temp);
+        letter = temp[0];
+        if(letter == 'Y' || letter == 'y')
+        {
+                FILE* file = fopen(file_name, "w");
+                if(file == NULL){
+                        printf("Error opening file!\nmake sure file name is correct.\ninclude file extension e.g. file.txt\n input was %s\n", file_name);
+                        exit(-12);
+                }
+                write_tree(tree->root, file);
+                fclose(file);
+                printf("Saved successfully!\n");
+        }
+        else{
+                printf("Canceled!\n");
+        }
+}
+
+void handle_users(struct Tree* my_tree, char* file_name){
+        int input = 0;
+        int on = 1;
+        char temp[200];
+        while(on){
+                printf("***********************************\n");
+                printf("options:\n");
+                printf("1- View all entries\n");
+                printf("2- look up a word\n");
+                printf("3- Add new entry in dictionary\n");
+                printf("4- Print hight of tree\n");
+                printf("5- Print size of tree\n");
+                printf("6- Save dictionary\n");
+                printf("7- Exit\n");
+                printf("Choose option: ");
+                scanf(" %d", &input);
+
+                switch(input){
+                case 1:
+                        tree_print_all(my_tree->root);
+                        fgetc(stdin);
+                        break;
+                case 2:
+                        lookup_word(my_tree);
+
+                        break;
+                case 3:
+                        insert_new_word(my_tree);
+                        break;
+                case 4:
+                        printf("Tree hight is: %d\n", find_tree_hight(my_tree->root));
+                        fgetc(stdin);
+                        break;
+                case 5:
+                        printf("There are %d words in dictionary\n", my_tree->size);
+                        fgetc(stdin);
+                        break;
+                case 6:
+                        save_to_file(my_tree, file_name);
+                        break;
+                case 7:
+                        on ^= on;
+                        break;
+                default:
+                        printf("Please enter a valid choice! (1 -> 6)\n");
+                        fgets(temp, sizeof temp, stdin);
+                }
+                if(on)
+                        printf("Press Enter to get back\n");
+
+                fgetc(stdin);
+        }
+}
+
+void check_args(int argc){
+        if(argc < 2 ){
+                printf("Enter the name of a file!");
+                exit(-1);
+        }
+        else if(argc > 2){
+                printf("Enter only one Name!");
+                exit(-2);
+        }
+}
+
+int main(int argc, char** argv) {
+        check_args(argc);
+        char* target_file_name = argv[1];
+        FILE* target_file = fopen((const char*)target_file_name, "r");
+        if(target_file == NULL){
+                printf("Error opening file!\nmake sure file name is correct.\ninclude file extension e.g. file.txt\n input was %s\n", target_file_name);
+                exit(-12);
+        }
+        struct Tree* my_tree = build_tree(target_file);
+        fclose(target_file);
+
+        if(my_tree)
+                printf("File loaded successfully!\n");
+        else
+                 printf("Error loading file!");
+
+        handle_users(my_tree, target_file_name);
+
+        printf("Exited successfully!\n");
         return 0;
 }
 /***LEGACY CODE: FOR REFERENCE ONLY(personal attempt)
         who woudda thunk using a void function is worse...***/
 //main insert function, takes a root and a value and recursively
 //inserts the value
-//void rb_insert(struct Node* root, DATA value){
+//void rb_insert(struct Node* root, DATA* value){
 //        //check where to insert the new value
 //        //if the value is smaller, insert right
 //        //if larger, insert left
@@ -336,30 +473,29 @@ int main() {
 //}
 
 /************************DEBUGGING STUFF***************************************************************************/
-void print_tree_stuff(struct Tree* my_tree){
-        printf("root %d\t", my_tree->root->value);
-        if(my_tree->root->left)
-                printf("left %d\t",my_tree->root->left->value);
-        if(my_tree->root->right) {
-                printf("right %d\t",my_tree->root->right->value);
-                if(my_tree->root->right->right)
-                        printf("right right%d\t",my_tree->root->right->right->value);
-        }
-        printf("\n");
+void nprint(struct Node* node){
+        printf("Node is %s\n", node->value);
 }
-void parent_print(struct Node* node){
-        if(node->parent) printf("node %3d\tcolor %3d\tparent %3d\tcolor %3d\n", node->value, node->color, node->parent->value,node->parent->color);
-        else printf("root is %3d\tcolor is%3d\n");
-}
-
 void inserted(struct Node* node){
-        printf("inserted %d\tcolor = %d\n",node->value, node->color);
+        printf("inserted %s\tcolor = %d\n",node->value, node->color);
 }
 void traverse_indepth(struct Node* node){
         if(node == NULL) return;
         traverse_indepth(node->left);
-        printf("node %3d\tcolor %3d\n",node->value, node->color);
-//        parent_print(node);
+        printf("node %3s\tcolor %3d\n",node->value, node->color);
         traverse_indepth(node->right);
+}
+
+void compare_with_file(struct Tree* tree, char* file_name){
+
+
+
+
+
+//TODO: compare existing tree with an external file and check if they have same words
+
+
+
+
 }
 /************************************************************************************************/
