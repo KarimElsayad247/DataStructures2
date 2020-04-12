@@ -43,6 +43,7 @@ void write_tree(struct Node* node, FILE* file){
         write_tree(node->right, file);
 }
 
+
 void save_to_file(struct Tree* tree, char* file_name){
         fgetc(stdin);
         printf("This will overwrite the current file, are you sure?\n");

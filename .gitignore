@@ -1,5 +1,10 @@
-MergeSort\
+**/bin
 both.txt
 MergeSort.7z
-*.txt
+HeapSort/bin/
+MergeSort/bin/
+**.txt
+**.depend
+**.layout
+**.cpb
 RedBlackTree/words.zip
